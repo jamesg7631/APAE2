@@ -37,8 +37,21 @@ public class TaskManager {
             return "Task " + taskId + " already completed or cancelled";
         }
 
-        SlowCalculator calc = new SlowCalculator(taskId, this);
-        Thread thread = new Thread(calc, String.valueOf(taskId));
+        SlowCalculator calc = new SlowCalculator(taskId);
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                calc.run();
+                synchronized (TaskManager.this) {
+                    completeTask(taskId);
+                }
+            }
+        }, String.valueOf(taskId));
+
+        // Was struggling to come up with a way to call completeTask, when user uses cancel command.
+        // Previously, I put TaskManager into SlowCalculator. However, this led to deadlocks
+        // Could have been more explicit and created another wrapper class around SlowCalculator but
+        // did not want to create any more files.
 
         taskThreads.put(taskId, thread);
         calculators.put(taskId, calc);
@@ -47,16 +60,20 @@ public class TaskManager {
         return "started " + taskId;
     }
 
-    public synchronized String cancelTask(long taskId) {
+    public String cancelTask(long taskId) {
         // If task is completed or if task is cancelled do nothing!
-        if (completedTasks.contains(taskId) || cancelledTasks.contains(taskId)) {
-            return "";
+        Thread thread;
+        synchronized (this) {
+            if (completedTasks.contains(taskId) || cancelledTasks.contains(taskId)) {
+                return "";
+            }
+
+            cancelledTasks.add(taskId);
+            pendingTasks.remove(taskId);
+
+            thread = taskThreads.get(taskId);
         }
 
-        cancelledTasks.add(taskId);
-        pendingTasks.remove(taskId);
-
-        Thread thread = taskThreads.get(taskId);
         if (thread != null && thread.isAlive()) {
             thread.interrupt();
             try {
@@ -192,33 +209,44 @@ public class TaskManager {
         return false;
     }
 
-    public synchronized String finish() {
-        while (!pendingTasks.isEmpty() || anyTasksRunning()) {
-            Set<Long> tasksReadyToStart = new HashSet<>();
-            for (Long pendingTaskId : pendingTasks) {
-                Set<Long> taskDeps = dependencies.get(pendingTaskId);
-                if (taskDeps == null || taskDeps.isEmpty() || completedTasks.containsAll(taskDeps)) {
-                    tasksReadyToStart.add(pendingTaskId);
+    public String finish() {
+        while (true) {
+            Set<Long> tasksReadyToStart;
+            Set<Thread> threadsToJoin;
+
+            synchronized (this) {
+                if (pendingTasks.isEmpty() && !anyTasksRunning()) {
+                    break;
                 }
-            }
-
-            for (Long taskIdToStart : tasksReadyToStart) {
-                startTask(taskIdToStart);
-            }
-
-            for (Thread thread : taskThreads.values()) {
-                try {
-                    thread.join();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+                tasksReadyToStart = new HashSet<>();
+                for (Long pendingTaskId : pendingTasks) {
+                    Set<Long> taskDeps = dependencies.get(pendingTaskId);
+                    if (taskDeps == null || taskDeps.isEmpty() || completedTasks.containsAll(taskDeps)) {
+                        tasksReadyToStart.add(pendingTaskId);
+                    }
                 }
-            }
 
-            if (tasksReadyToStart.isEmpty() && !anyTasksRunning()) {
-                break;
+                for (Long taskIdToStart : tasksReadyToStart) {
+                    startTask(taskIdToStart);
+                }
+
+                threadsToJoin = new HashSet<>();
+
+                for (Thread thread : taskThreads.values()) {
+                    if (thread.isAlive()) {
+                        threadsToJoin.add(thread);
+                    }
+                }
+
+                for (Thread thread : threadsToJoin) {
+                    try {
+                        thread.join();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
             }
         }
-
         return "finished";
     }
 
