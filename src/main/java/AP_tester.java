@@ -1,12 +1,12 @@
 public class AP_tester {
     public static void main(String[] args) {
         Solution solution = new Solution();
-		instructionTester(solution);
+//		instructionTester(solution);
 //		System.out.println(abortSpeedTester(solution));
 //		successiveAfterTester(solution);
 //		AfterNoRunnableThread(solution);
 //		noCalculationTester(solution);
-//		circularDependencyTester(solution);
+		circularDependencyTester(solution);
 //		cancelNonExistant(solution);
 //		System.out.println(cancelSpeedTester(solution));
 //		competingAfterTester(solution);

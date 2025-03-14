@@ -153,7 +153,7 @@ public class TaskManager {
             return startTask(taskId);
         }
 
-        return "Task " + taskId + " will after tasks " + dependsOn;
+        return taskId + " will start after " + dependsOn;
     }
 
     private boolean hasCircularDependency(long taskID, Set<Long> dependsOn) {
@@ -242,22 +242,38 @@ public class TaskManager {
         return false;
     }
 
-    public synchronized String abort() {
-        for (Thread thread : taskThreads.values()) {
-            if (thread.isAlive()) {
-                thread.interrupt();
+    public String abort() {
+        Set<Thread> threadsToJoin;
+
+        // Step 1: Interrupt all active threads and take a snapshot.
+        synchronized (this) {
+            for (Thread thread : taskThreads.values()) {
+                if (thread.isAlive()) {
+                    thread.interrupt();
+                }
             }
+            // Snapshot of threads to join is taken while holding the lock.
+            threadsToJoin = new HashSet<>(taskThreads.values());
         }
 
-        for (Thread thread : taskThreads.values()) {
+        // Step 2: Join threads outside the synchronized block.
+        for (Thread thread : threadsToJoin) {
             try {
                 thread.join();
             } catch (InterruptedException e) {
+                // Restore the interrupted status.
+                //Thread.currentThread().interrupt();
                 e.printStackTrace();
             }
         }
-        cancelledTasks.addAll(pendingTasks);
-        pendingTasks.clear();
+
+        // Step 3: Update TaskManager state in a synchronized block.
+        synchronized (this) {
+            cancelledTasks.addAll(pendingTasks);
+            pendingTasks.clear();
+            // Notify any waiting threads (like finish()) that state has changed.
+            notifyAll();
+        }
 
         return "aborted";
     }
