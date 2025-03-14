@@ -43,7 +43,8 @@ public class TaskManager {
         taskThreads.put(taskId, thread);
         calculators.put(taskId, calc);
         thread.start();
-        return "Task " + taskId + " started";
+        pendingTasks.remove(taskId);
+        return "started " + taskId;
     }
 
     public synchronized String cancelTask(long taskId) {

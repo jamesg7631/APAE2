@@ -11,8 +11,7 @@ public class SlowCalculator implements Runnable{
     public void run() {
         final int result = calculateNumFactors(N);
         this.result = result;
-        manager.completeTask(N)
-        ;
+        manager.completeTask(N);
     }
 
     public int getResult() {
