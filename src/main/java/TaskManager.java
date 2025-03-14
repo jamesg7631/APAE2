@@ -127,6 +127,7 @@ public class TaskManager {
                 }
             }
         }
+        notifyAll();
     }
 
     public synchronized String addTask(long taskId, Set<Long> dependsOn) {
@@ -209,42 +210,24 @@ public class TaskManager {
         return false;
     }
 
-    public String finish() {
-        while (true) {
-            Set<Long> tasksReadyToStart;
-            Set<Thread> threadsToJoin;
-
-            synchronized (this) {
-                if (pendingTasks.isEmpty() && !anyTasksRunning()) {
-                    break;
+    public synchronized String finish() {
+        while (!pendingTasks.isEmpty() || anyTasksRunning()) {
+            // Determine which pending tasks are ready to start and start them
+            Set<Long> tasksReadyToStart = new HashSet<>();
+            for (Long pendingTaskId : pendingTasks) {
+                Set<Long> taskDeps = dependencies.get(pendingTaskId);
+                if (taskDeps == null || taskDeps.isEmpty() || completedTasks.containsAll(taskDeps)) {
+                    tasksReadyToStart.add(pendingTaskId);
                 }
-                tasksReadyToStart = new HashSet<>();
-                for (Long pendingTaskId : pendingTasks) {
-                    Set<Long> taskDeps = dependencies.get(pendingTaskId);
-                    if (taskDeps == null || taskDeps.isEmpty() || completedTasks.containsAll(taskDeps)) {
-                        tasksReadyToStart.add(pendingTaskId);
-                    }
-                }
-
-                for (Long taskIdToStart : tasksReadyToStart) {
-                    startTask(taskIdToStart);
-                }
-
-                threadsToJoin = new HashSet<>();
-
-                for (Thread thread : taskThreads.values()) {
-                    if (thread.isAlive()) {
-                        threadsToJoin.add(thread);
-                    }
-                }
-
-                for (Thread thread : threadsToJoin) {
-                    try {
-                        thread.join();
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
+            }
+            for (Long taskIdToStart : tasksReadyToStart) {
+                startTask(taskIdToStart);
+            }
+            try {
+                // Wait until notified (or timeout after a short delay)
+                wait(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
         }
         return "finished";
