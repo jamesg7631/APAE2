@@ -1,20 +1,20 @@
 public class AP_tester {
     public static void main(String[] args) {
         Solution solution = new Solution();
-//		instructionTester(solution);
+//        instructionTester(solution); //Pass
 //		System.out.println(abortSpeedTester(solution));
-//		successiveAfterTester(solution);
-//		AfterNoRunnableThread(solution);
-//		noCalculationTester(solution);
-		circularDependencyTester(solution);
-//		cancelNonExistant(solution);
-//		System.out.println(cancelSpeedTester(solution));
-//		competingAfterTester(solution);
+		successiveAfterTester(solution); // Go over again
+//		AfterNoRunnableThread(solution); Seems to have passed
+//		noCalculationTester(solution); Passed
+//		circularDependencyTester(solution); // Pass. Need to fix minor print bug for non circular dependency case
+//		cancelNonExistant(solution); // Returns blank output. Should I return null for the real version
+//		System.out.println(cancelSpeedTester(solution)); // Pass
+//		competingAfterTester(solution); // Pass
 //		CancelThreadWhileWaitingTester(solution);
-//		CancelMiddleOfMultipleWaitingThreadsTester(solution);
-//		multipleGetStatusTester(solution);
-//		finishCalculationTester(solution);
-//		nothingToFinishTester(solution);
+//		CancelMiddleOfMultipleWaitingThreadsTester(solution); // Fails but I think its ok. Think test output is wrong
+//		multipleGetStatusTester(solution); Pass
+//		finishCalculationTester(solution); Pass
+//		nothingToFinishTester(solution); Pass
 //		wrongCommandsTester(solution);
     }
 
@@ -148,7 +148,7 @@ public class AP_tester {
         System.out.println(solution.runCommand("after 1111111111 2"));
         System.out.println(solution.runCommand("after 2 33333333333"));
         System.out.println(solution.runCommand("after 33333333333 44444444444"));
-        System.out.println(solution.runCommand("cancel 2"));
+        System.out.println(solution.runCommand("cancel 2")); // Printed "" when 2 was already completed. Should it instead be null
         System.out.println("3* and 4* should start immediately");
         System.out.println("there should be 3 running, 1*, 3*");
         System.out.println(solution.runCommand("running"));
@@ -216,7 +216,7 @@ public class AP_tester {
 
     public static void sleep() {
         try {
-            Thread.sleep(5000); // Pauses for 1400 milliseconds (1.4 second)
+            Thread.sleep(20000); // Pauses for 1400 milliseconds (1.4 second)
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt(); // Restore interrupted status
         }

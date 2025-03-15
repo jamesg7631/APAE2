@@ -79,7 +79,7 @@ public class TaskManager {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            return "Cancelled " + taskId;
+            return "cancelled " + taskId;
         }
 
         return ""; // Try with null as well. The spec says do nothing

@@ -64,10 +64,7 @@ public class Solution implements CommandRunner{
             if (parts.length != 3) {
                 return false;
             }
-
-            if (!isLong(parts[1]) || !isLong(parts[2])) {
-                return false;
-            }
+            return isLong(parts[1]) && isLong(parts[2]);
         } else if ("finish".equals(parts[0])) {
             return parts.length == 1;
         } else if ("abort".equals(parts[0])) {
