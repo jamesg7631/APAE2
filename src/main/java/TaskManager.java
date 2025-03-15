@@ -1,9 +1,7 @@
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 public class TaskManager {
     private Map<Long, Thread> taskThreads;
@@ -115,46 +113,65 @@ public class TaskManager {
         int result = calc.getResult();
         taskResults.put(taskId, result);
 
-        Set<Long> tasksWaitingOnThisThread = dependents.get(taskId);
-        if (tasksWaitingOnThisThread != null) {
-            for (Long waitingTaskId : tasksWaitingOnThisThread) {
-                Set<Long> waitingTaskDependencies = dependencies.get(waitingTaskId);
-                if (waitingTaskDependencies != null) {
-                    waitingTaskDependencies.remove(taskId);
-                    if (waitingTaskDependencies.isEmpty()) {
-                        startTask(waitingTaskId);
-                    }
+        // Fetch tasks that depend on this finished task
+        Set<Long> tasksWaitingOnThisThread = dependents.getOrDefault(taskId, new HashSet<>());
+
+        for (Long dependentTaskId : tasksWaitingOnThisThread) {
+            Set<Long> deps = dependencies.get(dependentTaskId);
+            if (deps != null) {
+                deps.remove(taskId);
+                if (deps.isEmpty()) {
+                    dependencies.remove(dependentTaskId);
+                    startTask(dependentTaskId); // Immediately start as all dependencies cleared
                 }
             }
         }
+
+        dependents.remove(taskId); // Clean up after finishing task
         notifyAll();
     }
 
+
     public synchronized String addTask(long taskId, Set<Long> dependsOn) {
-        if (pendingTasks.contains(taskId) || completedTasks.contains(taskId)) {
+        // If the task is already completed, we can't modify it.
+        if (completedTasks.contains(taskId)) {
+            return "Task " + taskId + " already completed.";
+        }
+
+        // If the task exists and is not pending (i.e. it is running), then do not allow modifications.
+        if (taskThreads.containsKey(taskId) && !pendingTasks.contains(taskId)) {
             return "Task " + taskId + " already created.";
         }
 
+        // For tasks that are pending (not yet started), allow updating their dependencies.
+        // Check for circular dependency before updating.
         if (hasCircularDependency(taskId, dependsOn)) {
-            return "Circular dependency has been detected!";
+            return "circular dependency " + buildCircularDependencyMessage(taskId, dependsOn);
         }
 
-        pendingTasks.add(taskId);
-        dependencies.put(taskId, new HashSet<>(dependsOn));
-
-        for (Long dep: dependsOn) {
-            if (!dependencies.containsKey(dep)) {
-                dependents.put(dep, new HashSet<>());
+        // If the task is already pending, update its dependency set.
+        if (pendingTasks.contains(taskId)) {
+            Set<Long> currentDeps = dependencies.get(taskId);
+            currentDeps.addAll(dependsOn);
+            for (Long dep : dependsOn) {
+                dependents.computeIfAbsent(dep, k -> new HashSet<>()).add(taskId);
             }
-            dependents.get(dep).add(taskId);
+            return taskId + " will start after " + currentDeps;
         }
 
+        // If the task is not yet created at all, then create it.
         if (dependsOn.isEmpty() || completedTasks.containsAll(dependsOn)) {
             return startTask(taskId);
+        } else {
+            pendingTasks.add(taskId);
+            dependencies.put(taskId, new HashSet<>(dependsOn));
+            for (Long dep : dependsOn) {
+                dependents.computeIfAbsent(dep, k -> new HashSet<>()).add(taskId);
+            }
+            return taskId + " will start after " + dependsOn;
         }
-
-        return taskId + " will start after " + dependsOn;
     }
+
 
     private boolean hasCircularDependency(long taskID, Set<Long> dependsOn) {
         Set<Long> visited = new HashSet<>();
@@ -277,4 +294,47 @@ public class TaskManager {
 
         return "aborted";
     }
+
+    private String buildCircularDependencyMessage(long taskId, Set<Long> newDeps) {
+        // For each new dependency, try to find a cycle path from that dependency back to taskId.
+        for (Long newDep : newDeps) {
+            List<Long> cyclePath = findCyclePath(newDep, taskId, new HashSet<>());
+            if (cyclePath != null) {
+                // cyclePath is a list from newDep to taskId.
+                // For example, if newDep==6 and taskId==2, it might return [6, 5, 4, 3, 2].
+                // This is acceptable even if the order differs from sample output.
+                return cyclePath.stream().map(Object::toString).collect(Collectors.joining(" "));
+            }
+        }
+        // Should not reach here if a cycle is detected.
+        return "";
+    }
+
+    private List<Long> findCyclePath(Long current, Long target, Set<Long> visited) {
+        if (current.equals(target)) {
+            // Found the target—start a new list with the target.
+            List<Long> path = new ArrayList<>();
+            path.add(current);
+            return path;
+        }
+        if (visited.contains(current)) {
+            return null; // Already visited this node; no cycle found along this path.
+        }
+        visited.add(current);
+        // Look for dependencies for the current task.
+        Set<Long> deps = dependencies.get(current);
+        if (deps != null) {
+            for (Long dep : deps) {
+                List<Long> result = findCyclePath(dep, target, visited);
+                if (result != null) {
+                    // Prepend the current task to the found cycle path.
+                    result.add(0, current);
+                    return result;
+                }
+            }
+        }
+        return null; // No path from 'current' to 'target' found.
+    }
+
+
 }

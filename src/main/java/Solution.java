@@ -36,10 +36,10 @@ public class Solution implements CommandRunner{
         }
     }
 
-    public synchronized String after(long taskId, long afterTaskId) {
+    public synchronized String after(long dependencyTaskId, long dependentTaskId) {
         Set<Long> dependsOn = new HashSet<>();
-        dependsOn.add(afterTaskId);
+        dependsOn.add(dependencyTaskId);
 
-        return taskManager.addTask(taskId, dependsOn);
+        return taskManager.addTask(dependentTaskId, dependsOn);
     }
 }
