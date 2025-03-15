@@ -86,7 +86,7 @@ public class TaskManager {
     }
 
     public synchronized String getTaskStatus(long taskId) {
-        if (completedTasks.contains(taskId)) {
+        if (completedTasks.contains(taskId) && taskResults.get(taskId) != -2) {
             Integer result = taskResults.get(taskId);
             return "result is " + result;
         } else if (cancelledTasks.contains(taskId)) {
