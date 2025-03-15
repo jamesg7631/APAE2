@@ -168,7 +168,9 @@ public class TaskManager {
             for (Long dep : dependsOn) {
                 dependents.computeIfAbsent(dep, k -> new HashSet<>()).add(taskId);
             }
-            return taskId + " will start after " + dependsOn;
+
+            Long[] dependent = dependsOn.toArray(new Long[0]);
+            return taskId + " will start after " + dependent[0];
         }
     }
 
