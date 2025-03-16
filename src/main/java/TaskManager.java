@@ -68,9 +68,22 @@ public class TaskManager {
 
             cancelledTasks.add(taskId);
             pendingTasks.remove(taskId);
-
             thread = taskThreads.get(taskId);
+            Set<Long> tasksWaitingOnThisThread = dependents.getOrDefault(taskId, new HashSet<>());
+
+            for (Long dependentTaskId : tasksWaitingOnThisThread) {
+                Set<Long> deps = dependencies.get(dependentTaskId);
+                if (deps != null) {
+                    deps.remove(taskId);
+                    if (deps.isEmpty()) {
+                        dependencies.remove(dependentTaskId);
+                        startTask(dependentTaskId); // Immediately start as all dependencies cleared
+                    }
+                }
+            }
         }
+
+
 
         if (thread != null && thread.isAlive()) {
             thread.interrupt();
